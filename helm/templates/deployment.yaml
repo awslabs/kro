@@ -4,34 +4,23 @@ metadata:
   name: {{ include "kro.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ include "kro.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-    k8s-app: {{ include "kro.name" . }}
-    helm.sh/chart: {{ include "kro.chart" . }}
+    {{- include "kro.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.deployment.replicaCount }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "kro.name" . }}
-      app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- include "kro.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-    {{- if .Values.deployment.annotations }}
+      {{- with .Values.deployment.podAnnotations }}
       annotations:
-      {{- range $key, $value := .Values.deployment.annotations }}
-        {{ $key }}: {{ $value | quote }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-    {{- end }}
       labels:
-        app.kubernetes.io/name: {{ include "kro.name" . }}
-        app.kubernetes.io/instance: {{ .Release.Name }}
-        app.kubernetes.io/managed-by: Helm
-        k8s-app: {{ include "kro.name" . }}
-      {{- range $key, $value := .Values.deployment.labels }}
-        {{ $key }}: {{ $value | quote }}
-      {{- end }}
+        {{- include "kro.selectorLabels" . | nindent 8 }}
+        {{- with .Values.deployment.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -39,73 +28,31 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "kro.serviceAccountName" . }}
       securityContext:
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 10
-      nodeSelector: {{ toYaml .Values.deployment.nodeSelector | nindent 8 }}
-      {{ if .Values.deployment.tolerations -}}
-      tolerations: {{ toYaml .Values.deployment.tolerations | nindent 8 }}
-      {{ end -}}
-      {{ if .Values.deployment.affinity -}}
-      affinity: {{ toYaml .Values.deployment.affinity | nindent 8 }}
-      {{ end -}}
-      {{ if .Values.deployment.priorityClassName -}}
-      priorityClassName: {{ .Values.deployment.priorityClassName }}
-      {{ end -}}
-      hostIPC: false
-      hostPID: false
-      hostNetwork: {{ .Values.deployment.hostNetwork }}
-      dnsPolicy: {{ .Values.deployment.dnsPolicy }}
-      {{- if .Values.deployment.extraVolumes }}
-      volumes:
-        {{ toYaml .Values.deployment.extraVolumes | indent 8}}
-      {{- end }}
+        {{- toYaml .Values.deployment.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.deployment.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-          - name: metricsport
-            containerPort: {{ .Values.deployment.containerPort }}
+            - name: metricsport
+              containerPort: {{ .Values.deployment.containerPort }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.deployment.extraVolumeMounts -}}
-          volumeMounts:
-            {{ toYaml .Values.deployment.extraVolumeMounts | nindent 10 }}
-          {{- end }}
-          securityContext:
-            runAsUser: 1000
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            privileged: false
-            capabilities:
-              drop:
-                - ALL
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8079
-            initialDelaySeconds: 15
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: 8079
-            initialDelaySeconds: 10
-            periodSeconds: 10
+            {{- toYaml .Values.deployment.resources | nindent 12 }}
           env:
             - name: KRO_ALLOW_CRD_DELETION
-              value: {{ .Values.config.allowCRDDeletion | quote }}
+              value: {{ .Values.deployment.config.allowCRDDeletion | quote }}
             - name: KRO_METRICS_BIND_ADDRESS
-              value: {{ .Values.config.metricsBindAddress | quote }}
+              value: {{ .Values.deployment.config.metricsBindAddress | quote }}
             - name: KRO_HEALTH_PROBE_BIND_ADDRESS
-              value: {{ .Values.config.healthProbeBindAddress | quote }}
+              value: {{ .Values.deployment.config.healthProbeBindAddress | quote }}
             - name: KRO_RESOURCE_GROUP_CONCURRENT_RECONCILES
-              value: {{ .Values.config.resourceGroupConcurrentReconciles | quote }}
+              value: {{ .Values.deployment.config.resourceGroupConcurrentReconciles | quote }}
             - name: KRO_DYNAMIC_CONTROLLER_CONCURRENT_RECONCILES
-              value: {{ .Values.config.dynamicControllerConcurrentReconciles | quote }}
+              value: {{ .Values.deployment.config.dynamicControllerConcurrentReconciles | quote }}
             - name: KRO_LOG_LEVEL
-              value: {{ .Values.config.logLevel | quote }}
+              value: {{ .Values.deployment.config.logLevel | quote }}
           args:
             - --allow-crd-deletion
             - "$(KRO_ALLOW_CRD_DELETION)"
@@ -119,3 +66,27 @@ spec:
             - "$(KRO_DYNAMIC_CONTROLLER_CONCURRENT_RECONCILES)"
             - --log-level
             - "$(KRO_LOG_LEVEL)"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8079
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8079
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      {{- with .Values.deployment.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.deployment.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.deployment.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

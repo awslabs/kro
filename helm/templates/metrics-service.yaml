@@ -2,28 +2,24 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Chart.Name | trimSuffix "-chart" | trunc 44 }}-metrics
+  name: {{ include "kro.fullname" . }}-metrics
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ include "kro.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-    k8s-app: {{ include "kro.name" . }}
-    helm.sh/chart: {{ include "kro.chart" . }}
+    {{- include "kro.labels" . | nindent 4 }}
+    {{- with .Values.metrics.service.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.metrics.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   selector:
-    app.kubernetes.io/name: {{ include "kro.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: Helm
-    k8s-app: {{ include "kro.name" . }}
-  {{- range $key, $value := .Values.deployment.labels }}
-    {{ $key }}: {{ $value | quote }}
-  {{- end }}
+    {{- include "kro.selectorLabels" . | nindent 4 }}
   type: {{ .Values.metrics.service.type }}
   ports:
-  - name: metricsport
-    port: 8080
-    targetPort: http
+  - name: metrics
+    port: {{ .Values.metrics.service.port }}
+    targetPort: {{ .Values.deployment.containerPort }}
     protocol: TCP
 {{- end }}
