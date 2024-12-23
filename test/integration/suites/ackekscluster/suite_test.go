@@ -15,6 +15,7 @@ package ackekscluster_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -402,6 +403,55 @@ var _ = Describe("EKSCluster", func() {
 			g.Expect(clusterARN).To(Equal("arn:aws:eks:us-west-2:123456789012:cluster/test-instance"))
 		}, 20*time.Second, time.Second).Should(Succeed())
 
+		// Before deletion, check version update
+		// Store resource versions
+		latestResources := make(map[string]*unstructured.Unstructured)
+		for _, obj := range []*unstructured.Unstructured{
+			vpc, igw, rt, subnetA, subnetB, cluster, adminRole, eip, nat, nodeRole, nodeGroup, clusterRole,
+		} {
+			latestResources[fmt.Sprintf("%s/%s", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName())] = obj
+		}
+
+		// Update cluster version
+		Eventually(func(g Gomega) {
+			err := env.Client.Get(ctx, types.NamespacedName{
+				Name:      "test-instance",
+				Namespace: namespace,
+			}, instance)
+			g.Expect(err).ToNot(HaveOccurred())
+
+			spec := instance.Object["spec"].(map[string]interface{})
+			spec["version"] = "1.28"
+			err = env.Client.Update(ctx, instance)
+			g.Expect(err).ToNot(HaveOccurred())
+		}, 10*time.Second, time.Second).Should(Succeed())
+
+		// Wait and verify only cluster was updated
+		time.Sleep(5 * time.Second)
+		Eventually(func(g Gomega) {
+
+			for key, latestResource := range latestResources {
+				kind := strings.Split(key, "/")[0]
+				name := strings.Split(key, "/")[1]
+
+				obj := &unstructured.Unstructured{}
+				obj.SetGroupVersionKind(latestResource.GetObjectKind().GroupVersionKind())
+				err := env.Client.Get(ctx, types.NamespacedName{
+					Name:      name,
+					Namespace: namespace,
+				}, obj)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				if kind == "Cluster" {
+					Expect(obj.GetResourceVersion()).ToNot(Equal(latestResource.GetResourceVersion()),
+						"Cluster should be updated for version change")
+				} else {
+					Expect(obj.GetResourceVersion()).To(Equal(latestResource.GetResourceVersion()),
+						"Resource %s should not be updated during version change", key)
+				}
+			}
+		}, 60*time.Second, time.Second).Should(Succeed())
+
 		// Delete instance
 		Expect(env.Client.Delete(ctx, instance)).To(Succeed())
 
@@ -429,4 +479,5 @@ var _ = Describe("EKSCluster", func() {
 		// Cleanup namespace
 		Expect(env.Client.Delete(ctx, ns)).To(Succeed())
 	})
+
 })
