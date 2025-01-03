@@ -163,7 +163,7 @@ func (b *Builder) NewResourceGroup(originalCR *v1alpha1.ResourceGroup) (*Graph, 
 	// That's because the instance status schema is inferred from the CEL expressions
 	// in the status field of the instance resource. Those CEL expressions refer to
 	// the resources defined in the resource group. Hence, we need to build the resources
-	// first, to be able ot generate a proper schema for the instance status.
+	// first, to be able to generate a proper schema for the instance status.
 
 	//
 
@@ -190,6 +190,7 @@ func (b *Builder) NewResourceGroup(originalCR *v1alpha1.ResourceGroup) (*Graph, 
 	// 4. Infer the status schema based on the CEL expressions.
 
 	instance, err := b.buildInstanceResource(
+		rg.Spec.Schema.Group,
 		rg.Spec.Schema.APIVersion,
 		rg.Spec.Schema.Kind,
 		rg.Spec.Schema,
@@ -415,7 +416,7 @@ func (b *Builder) buildDependencyGraph(
 // Since instances are defined using the "SimpleSchema" format, we use a different
 // approach to build the instance resource. We need to:
 func (b *Builder) buildInstanceResource(
-	apiVersion, kind string,
+	group, apiVersion, kind string,
 	rgDefinition *v1alpha1.Schema,
 	resources map[string]*Resource,
 ) (*Resource, error) {
@@ -428,7 +429,7 @@ func (b *Builder) buildInstanceResource(
 	// CRD declarations.
 
 	// The instance resource is a Kubernetes resource, so it has a GroupVersionKind.
-	gvk := metadata.GetResourceGroupInstanceGVK(apiVersion, kind)
+	gvk := metadata.GetResourceGroupInstanceGVK(group, apiVersion, kind)
 
 	// We need to unmarshal the instance schema to a map[string]interface{} to
 	// make it easier to work with.
@@ -451,7 +452,7 @@ func (b *Builder) buildInstanceResource(
 
 	// Synthesize the CRD for the instance resource.
 	overrideStatusFields := true
-	instanceCRD := crd.SynthesizeCRD(apiVersion, kind, *instanceSpecSchema, *instanceStatusSchema, overrideStatusFields)
+	instanceCRD := crd.SynthesizeCRD(group, apiVersion, kind, *instanceSpecSchema, *instanceStatusSchema, overrideStatusFields)
 
 	// Emulate the CRD
 	instanceSchemaExt := instanceCRD.Spec.Versions[0].Schema.OpenAPIV3Schema

@@ -35,13 +35,13 @@ func (r *ResourceGroupReconciler) cleanupResourceGroup(ctx context.Context, rg *
 	log.V(1).Info("cleaning up resource group", "name", rg.Name)
 
 	// shutdown microcontroller
-	gvr := metadata.GetResourceGroupInstanceGVR(rg.Spec.Schema.APIVersion, rg.Spec.Schema.Kind)
+	gvr := metadata.GetResourceGroupInstanceGVR(rg.Spec.Schema.Group, rg.Spec.Schema.APIVersion, rg.Spec.Schema.Kind)
 	if err := r.shutdownResourceGroupMicroController(ctx, &gvr); err != nil {
 		return fmt.Errorf("failed to shutdown microcontroller: %w", err)
 	}
 
 	// cleanup CRD
-	crdName := extractCRDName(rg.Spec.Schema.Kind)
+	crdName := extractCRDName(rg.Spec.Schema.Group, rg.Spec.Schema.Kind)
 	if err := r.cleanupResourceGroupCRD(ctx, crdName); err != nil {
 		return fmt.Errorf("failed to cleanup CRD %s: %w", crdName, err)
 	}
@@ -75,8 +75,8 @@ func (r *ResourceGroupReconciler) cleanupResourceGroupCRD(ctx context.Context, c
 
 // extractCRDName generates the CRD name from a given kind by converting it to plural form
 // and appending the Kro domain name.
-func extractCRDName(kind string) string {
+func extractCRDName(group, kind string) string {
 	return fmt.Sprintf("%s.%s",
 		flect.Pluralize(strings.ToLower(kind)),
-		v1alpha1.KroDomainName)
+		group)
 }

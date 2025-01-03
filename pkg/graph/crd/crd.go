@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/awslabs/kro/api/v1alpha1"
 	"github.com/gobuffalo/flect"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,19 +24,19 @@ import (
 
 // SynthesizeCRD generates a CustomResourceDefinition for a given API version and kind
 // with the provided spec and status schemas~
-func SynthesizeCRD(apiVersion, kind string, spec, status extv1.JSONSchemaProps, statusFieldsOverride bool) *extv1.CustomResourceDefinition {
-	return newCRD(apiVersion, kind, newCRDSchema(spec, status, statusFieldsOverride))
+func SynthesizeCRD(group, apiVersion, kind string, spec, status extv1.JSONSchemaProps, statusFieldsOverride bool) *extv1.CustomResourceDefinition {
+	return newCRD(group, apiVersion, kind, newCRDSchema(spec, status, statusFieldsOverride))
 }
 
-func newCRD(apiVersion, kind string, schema *extv1.JSONSchemaProps) *extv1.CustomResourceDefinition {
+func newCRD(group, apiVersion, kind string, schema *extv1.JSONSchemaProps) *extv1.CustomResourceDefinition {
 	pluralKind := flect.Pluralize(strings.ToLower(kind))
 	return &extv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s.%s", pluralKind, v1alpha1.KroDomainName),
+			Name:            fmt.Sprintf("%s.%s", pluralKind, group),
 			OwnerReferences: nil, // Injecting owner references is the responsibility of the caller.
 		},
 		Spec: extv1.CustomResourceDefinitionSpec{
-			Group: v1alpha1.KroDomainName,
+			Group: group,
 			Names: extv1.CustomResourceDefinitionNames{
 				Kind:     kind,
 				ListKind: kind + "List",

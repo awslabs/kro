@@ -103,6 +103,12 @@ spec:
                     x-kubernetes-validations:
                     - message: apiVersion is immutable
                       rule: self == oldSelf
+                  group:
+                    default: kro.run
+                    description: |-
+                      The group of the resourcegroup. This is used to set the API group
+                      of the generated CRD. If omitted, it defaults to "kro.run".
+                    type: string
                   kind:
                     description: |-
                       The kind of the resourcegroup. This is used to generate
