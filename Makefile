@@ -1,4 +1,3 @@
-
 AWS_ACCOUNT_ID ?= $(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION ?= us-west-2
 RELEASE_VERSION ?= dev-$(shell git rev-parse --short HEAD)
@@ -200,3 +199,8 @@ publish-helm: ## Helm publish
 
 .PHONY:
 release: build-image publish-image package-helm publish-helm
+
+# Run e2e tests
+.PHONY: test-e2e
+test-e2e: ## Run e2e tests
+	go test -v ./test/e2e/...
